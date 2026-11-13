@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Wandering Weather – Dr. Voss’s Office</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#161a14;--ink:#f2f2f2;--mut:#aaa;--pn:#2b2b2b;--hi:#555;--lo:#1a1a1a;--bt:#6d6d6d;--ac:#8fd16a;--pa:#e9d8a6;--pi:#2a2110;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#b9c9a8;--ink:#1a1a1a;--mut:#444;--pn:#c6c6c6;--hi:#fff;--lo:#7a7a7a;--bt:#a0a0a0}}
+:root[data-theme="light"]{--bg:#b9c9a8;--ink:#1a1a1a;--mut:#444;--pn:#c6c6c6;--hi:#fff;--lo:#7a7a7a;--bt:#a0a0a0}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:1.3rem/1.25 VT323,"Courier New",monospace}
+main{max-width:940px;margin:0 auto;padding:12px}
+h1{font-size:1.9rem;margin:4px 0 10px;letter-spacing:.04em}h2{font-size:1.3rem;margin:0 0 8px}
+.p{background:var(--pn);border:3px solid #000;box-shadow:inset 3px 3px var(--hi),inset -3px -3px var(--lo);padding:12px;margin-bottom:12px}
+.stage{position:relative;border:3px solid #000}
+canvas{width:100%;display:block;image-rendering:pixelated;aspect-ratio:16/9}
+#gate{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+button,select{font:inherit;color:var(--ink);background:var(--bt);border:3px solid #000;box-shadow:inset 2px 2px var(--hi),inset -2px -2px var(--lo);padding:4px 10px;cursor:pointer}
+button:hover{background:#6b7fd6;color:#fff}
+#enter{font-size:1.6rem;padding:10px 22px}
+#who{color:var(--ac)}#you{color:var(--mut);min-height:1.2em}#txt{min-height:3.8em;font-size:1.45rem;margin:4px 0 8px}
+#opts{display:grid;gap:8px}#opts button{text-align:left;font-size:1.35rem}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+#book{background:var(--pa);color:var(--pi);box-shadow:inset 3px 3px #fff8,inset -3px -3px #0003}
+#notes{margin:0;padding-left:22px;max-height:260px;overflow:auto}#notes li{margin-bottom:5px}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+label{display:flex;flex-direction:column;font-size:1rem;color:var(--mut)}label.sw{flex-direction:row;align-items:center;gap:6px;color:var(--ink)}
+input[type=range]{width:110px;accent-color:var(--ac)}
+#chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px}
+#msg{color:var(--mut);font-size:1.1rem}
+</style>
+</head>
+<body>
+<main>
+<h1>⛏ The Wandering Weather</h1>
+<div class="stage"><canvas id="cv" width="192" height="108"></canvas>
+<div id="gate"><button id="enter">🚪 Enter the office</button></div></div>
+
+<div class="p"><div id="who">Dr. Voss <span style="color:var(--mut)" id="case"></span></div><div id="you"></div><div id="txt"></div><div id="opts"></div><div id="topics" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div><div style="color:var(--mut);font-size:1.05rem;margin-top:6px">Ask Dr. Voss about a topic. The history and physics in this salon are real; the opinions are Voss’s.</div></div>
+
+<div class="two">
+<div class="p" id="book"><h2>📓 Dr. Voss’s notebook</h2><ol id="notes"><li>Nothing yet. Suspicious.</li></ol></div>
+<div class="p"><h2>🎵 Driftbox radio</h2>
+<div class="ctl">
+<button id="start">▶ Play</button>
+<label>Scale<select id="scale"></select></label>
+<label>Key<select id="root"></select></label>
+<label>Tempo<input type="range" id="bpm" min="46" max="110"></label>
+<label>Space<input type="range" id="wet" min="0" max="100"></label>
+<label class="sw"><input type="checkbox" id="evo" checked>Auto-evolve</label>
+<label class="sw"><input type="checkbox" id="dr">Drums</label>
+<button id="evnow">⚡ Evolve now</button>
+</div>
+<div id="chips"></div>
+<div id="msg">Change the sound and the sky outside follows. The doctor writes it all down.</div>
+</div></div>
+</main>
+<script>
+const $=i=>document.getElementById(i),pk=a=>a[Math.random()*a.length|0];
+const SC={"Minor":[0,2,3,5,7,8,10],"Dorian":[0,2,3,5,7,9,10],"Phrygian":[0,1,3,5,7,8,10],"Minor pentatonic":[0,3,5,7,10],"Major":[0,2,4,5,7,9,11],"Major pentatonic":[0,2,4,7,9],"Whole tone":[0,2,4,6,8,10],"Harmonic minor":[0,2,3,5,7,8,11]};
+const NN=["C","C♯","D","E♭","E","F","F♯","G","A♭","A","B♭","B"];
+const PR=[[0,5,3,4],[0,3,4,3],[0,2,5,4],[5,3,0,4],[0,6,5,4]];
+const S={scale:"Minor",root:9,bpm:72,wet:.55,drums:false,evo:true,play:false,step:0,next:0,prog:PR[0]};
+let ctx,mg,dry,wet,dl,an,nb,act=0,timer;
+const pc=d=>{const n=SC[S.scale].length;return((d%n)+n)%n};
+const fq=(o,d)=>{const sc=SC[S.scale],n=sc.length;return 440*Math.pow(2,(12*(o+1)+S.root+sc[pc(d)]+12*Math.floor(d/n)-69)/12)};
+function init(){
+ ctx=new(window.AudioContext||window.webkitAudioContext)();
+ const cp=ctx.createDynamicsCompressor();an=ctx.createAnalyser();an.fftSize=256;cp.connect(an);an.connect(ctx.destination);
+ mg=ctx.createGain();mg.gain.value=.6;const lp=ctx.createBiquadFilter();lp.frequency.value=2600;mg.connect(lp);
+ dry=ctx.createGain();lp.connect(dry);dry.connect(cp);wet=ctx.createGain();wet.connect(cp);
+ dl=ctx.createDelay(2);const fb=ctx.createGain();fb.gain.value=.45;lp.connect(dl);dl.connect(fb);fb.connect(dl);dl.connect(wet);
+ const vb=ctx.createConvolver(),L=ctx.sampleRate*1.6|0,ir=ctx.createBuffer(2,L,ctx.sampleRate);
+ for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<L;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/L,3)}
+ vb.buffer=ir;lp.connect(vb);vb.connect(wet);
+ nb=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);const n=nb.getChannelData(0);for(let i=0;i<n.length;i++)n[i]=Math.random()*2-1;fx();
+}
+function fx(){if(!ctx)return;wet.gain.value=S.wet*.7;dry.gain.value=1-S.wet*.25;dl.delayTime.value=60/S.bpm*.75}
+function vo(f,w,d,ty,v,pad){if(act>24&&!pad)return;const g=ctx.createGain(),o=ctx.createOscillator(),a=pad?d*.3:.01,e=w+(pad?d*1.3:d*1.8);
+ o.type=ty;o.frequency.value=f;g.gain.setValueAtTime(0,w);g.gain.linearRampToValueAtTime(v*.25,w+a);g.gain.exponentialRampToValueAtTime(.001,e);
+ o.connect(g);g.connect(mg);o.start(w);o.stop(e+.05);act++;o.onended=()=>{o.disconnect();g.disconnect();act--}}
+function kick(w){const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.setValueAtTime(130,w);o.frequency.exponentialRampToValueAtTime(40,w+.14);g.gain.setValueAtTime(.6,w);g.gain.exponentialRampToValueAtTime(.001,w+.4);o.connect(g);g.connect(mg);o.start(w);o.stop(w+.42)}
+function hat(w){const s=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();s.buffer=nb;f.type="highpass";f.frequency.value=7500;g.gain.setValueAtTime(.12,w);g.gain.exponentialRampToValueAtTime(.001,w+.05);s.connect(f);f.connect(g);g.connect(mg);s.start(w);s.stop(w+.1)}
+const ct=cr=>cr+pk([0,2,4,7]);
+function tick(){const sd=60/S.bpm/4;if(S.next<ctx.currentTime-.05)S.next=ctx.currentTime+.05;
+ while(S.next<ctx.currentTime+.2){const st=S.step,at=S.next,cr=pc(S.prog[(st>>5)%4]);
+  if(st>0&&st%128===0&&S.evo)evolve();
+  if(st%32===0)[0,2,4].forEach(o=>vo(fq(3,cr+o),at,sd*32,"triangle",.8,1));
+  if(st%8===0)vo(fq(2,cr),at,sd*8,"sine",.9);
+  if(st%2===0&&Math.random()<.5)vo(fq(4,ct(cr)),at,sd*2,"triangle",.45);
+  if(st%4===0&&Math.random()<.35)vo(fq(5,ct(cr)),at,sd*4,"sine",.35);
+  if(S.drums){if(st%8===0)kick(at);if(st%4===2)hat(at)}
+  S.step++;S.next+=sd}}
+function play(){if(!ctx)init();ctx.resume();S.play=true;S.next=ctx.currentTime+.1;timer=setInterval(tick,30);$("start").textContent="■ Stop"}
+function stop(){S.play=false;clearInterval(timer);$("start").textContent="▶ Play"}
+function evolve(){S.prog=pk(PR).slice();S.root=(S.root+pk([0,5,7,3,9,2]))%12;if(Math.random()<.8)S.scale=pk(Object.keys(SC));
+ S.bpm=Math.max(50,Math.min(100,S.bpm+Math.round((Math.random()-.5)*20)));S.drums=Math.random()<.4;fx();sync()}
+function sync(){$("scale").value=S.scale;$("root").value=S.root;$("bpm").value=S.bpm;$("wet").value=S.wet*100;$("dr").checked=S.drums}
+$("scale").innerHTML=Object.keys(SC).map(k=>`<option>${k}</option>`).join("");
+$("root").innerHTML=NN.map((n,i)=>`<option value="${i}">${n}</option>`).join("");
+$("start").onclick=()=>{try{S.play?stop():play()}catch(e){$("msg").textContent="Audio couldn’t start here. Try again."}};
+$("scale").onchange=e=>S.scale=e.target.value;$("root").onchange=e=>S.root=+e.target.value;
+$("bpm").oninput=e=>{S.bpm=+e.target.value;fx()};$("wet").oninput=e=>{S.wet=e.target.value/100;fx()};
+$("evo").onchange=e=>S.evo=e.target.checked;$("dr").onchange=e=>S.drums=e.target.checked;
+$("evnow").onclick=evolve;
+const MOODS={bright:()=>S.scale="Major pentatonic",dark:()=>S.scale="Minor",dreamy:()=>{S.scale="Whole tone";S.wet=.85},tense:()=>{S.scale="Harmonic minor";S.bpm=92},haunted:()=>S.scale="Phrygian",hazy:()=>S.scale="Minor pentatonic",gentle:()=>S.scale="Major"};
+Object.keys(MOODS).forEach(m=>{const b=document.createElement("button");b.textContent=m;b.onclick=()=>{MOODS[m]();S.prog=pk(PR).slice();fx();sync();if(!S.play)play()};$("chips").appendChild(b)});
+sync();
+
+// ---- weather from sound ----
+const WN={sunny:"sunshine",cloudy:"scattered clouds",overcast:"heavy overcast",rain:"steady rain",storm:"a thunderstorm",snow:"snowfall",fog:"thick fog"};
+const SK={sunny:"#6fb7ff",cloudy:"#7ab4ee",overcast:"#8a95a3",rain:"#5d6672",storm:"#2f3542",snow:"#aab4c4",fog:"#b9bec4"};
+const AM={sunny:"rgba(255,220,120,.08)",cloudy:"rgba(0,0,0,0)",overcast:"rgba(60,70,90,.14)",rain:"rgba(40,50,70,.22)",storm:"rgba(10,15,40,.4)",snow:"rgba(200,220,255,.1)",fog:"rgba(210,215,220,.16)"};
+const CL={sunny:1,cloudy:3,overcast:5,rain:5,storm:5,snow:4,fog:2};
+function wxNow(){const s=S.scale;let k=s==="Major pentatonic"?"sunny":s==="Major"?"cloudy":s==="Dorian"?"overcast":s==="Minor"?"rain":(s==="Phrygian"||s==="Harmonic minor")?"storm":s==="Whole tone"?"snow":"fog";
+ if(S.wet>.82&&k!=="sunny"&&k!=="storm")k="fog";return k}
+let wx="cloudy",pw="cloudy",fade=1,notes=[],sig="",t0=0,entered=false,seen=0;
+const wind=()=>S.bpm>85?1:S.bpm<58?.15:.5;
+function clk(){const s=((performance.now()-t0)/1000)|0;return String(s/60|0).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function watch(force){if(!entered)return;const k=wxNow(),sg=S.scale+"|"+S.root+"|"+Math.round(S.bpm/8)+"|"+S.drums;
+ if(!force&&sg===sig&&k===wx)return;
+ const desc=`${NN[S.root]} ${S.scale.toLowerCase()}, ${S.bpm} bpm${S.drums?", drums":""}`;
+ let txt=force?`Session begins. ${desc} → ${WN[k]}.`:k!==wx?`Sound shifted to ${desc}. The sky answered: ${WN[wx]} → ${WN[k]}.`:`Sound shifted to ${desc}. Sky unmoved (${WN[k]}). Odd.`;
+ sig=sg;if(k!==wx){pw=wx;wx=k;fade=0}
+ notes.unshift(`[${clk()}] ${txt}`);$("notes").innerHTML=notes.slice(0,14).map(n=>`<li>${n}</li>`).join("");$("msg").textContent="Forecast from the band: "+WN[k]+".";}
+setInterval(()=>watch(false),600);
+
+// ---- dialogue (intentionally repetitive loop) ----
+const ND=[
+{q:["Sit. Same chair as always. Tell me, where were you when the sky last changed?","Same chair, same question. Where were you when the sky last changed?","Sit. Do not touch the pencil. Where were you when the weather turned?"],o:[["Right here, listening.",["Listening. Everyone says that. Noted.","Listening. The classic alibi. Noted.","Right here. The chair confirms nothing."]],["Outside. I saw it happen.",["Outside. Interesting. The window disagrees.","Outside, you say. Your shoes are dry.","You saw it? Then why do you look so surprised?"]],["I don’t remember.",["Forgetting is a kind of evidence.","Forgetting. The most honest lie there is.","A gap in memory. I will fill it with ink."]]]},
+{q:["Right now the window shows {W}. Does that feel like your doing?","Look outside. {W}. Coincidence, or your handiwork?","The window insists on {W}. Did you arrange that?"],o:[["Yes, the music did it.",["The music. Yes. I wrote that down twice.","A confession! Smaller than I hoped, but a confession.","The music. I suspected the speakers all along."]],["No, weather is weather.",["Weather is never just weather in this office.","That is what the weather wants you to think.","Spoken like someone with something to hide."]],["Who are you to ask?",["I am the person holding the pencil.","A doctor. A detective. Mostly a pencil.","Someone who has seen this exact sky before."]]]},
+{q:["Let us review my notes. Latest entry: {N}","I keep records. Latest entry: {N}","Page one of my notebook says: {N}"],o:[["Read me another.",["I only read the latest. It is a rule.","Rules are rules. One entry per visit.","The older pages are sealed. For your safety."]],["That’s wrong.",["My notes are never wrong. Only early.","Wrong? I wrote it in pen. Mostly pencil.","Then explain the ink stain on page two."]],["Sounds suspicious.",["Now we are detectives together.","Finally, a colleague. Sit closer.","Suspicious is the correct word. Underlined."]]]},
+{q:["One more time. Did the sound change first, or the sky?","Think carefully. Which moved first, the sound or the sky?","The key question, if you will: sound first, or sky first?"],o:[["The sound.",["Then the sky is the witness.","Sound first. The sky merely followed orders.","Then the sky is innocent. Probably."]],["The sky.",["Then the sound is the accomplice.","Sky first? Then the music is covering for it.","Bold. The notebook may disagree."]],["Both.",["Then there is a third party. There always is.","Both at once. Nobody is that coordinated.","Then someone is conducting them. Both."]]]}];
+const WR={sunny:["Sunshine. Criminals love sunshine. Nobody checks their alibis.","Too bright. I do not trust a sky with nothing to hide."],cloudy:["Scattered clouds. Scattered thoughts, too.","Clouds drift. So do stories."],overcast:["Overcast. The sky is withholding.","Grey. The colour of a suspect who will not talk."],rain:["Listen to that rain. It is tapping out a confession.","Rain washes away evidence. Convenient."],storm:["Thunder. The sky is clearing its throat to testify.","A storm. Never a good sign for an alibi."],snow:["Snow. Everything quiet, everything covered. Very suspicious.","Snow buries footprints. How helpful for someone."],fog:["Fog. I cannot see the culprit, but neither can they.","In fog, everyone looks guilty."]};
+const aside=()=>Math.random()<.45?' '+pk(WR[wx]):'';
+const ST=[0,0,0];let lastCx=-1,lastAns='',tdone=0;
+const O=(a,b,c)=>[a,b,c].map(x=>[x[0],x.slice(1)]),W=k=>()=>wx===k;
+const CX=[
+{w:W('sunny'),q:['Sunshine again. Everything lit, nothing hidden. Why does that bother me?','Bright out there. Do you ever feel watched by weather?'],o:O(['It feels warm, honestly.','Warmth lowers guards. Dangerous.','Warm. I wrote “warm” and circled it twice.'],['I’d rather not look at it.','Avoiding the light. Telling.','The window does not care about your preferences.'],['Is the sun a suspect?','Every large bright object is a suspect.','Do not laugh. The sun has no alibi at night.'])},
+{w:W('cloudy'),q:['Scattered clouds. Scattered thoughts. Which ones are yours?','Partial cover. Half the sky is hiding something. Which half?'],o:O(['The left half, probably.','Left. Noted. I always suspected the left.','Probably. Probably is how every case begins.'],['Neither. Clouds are just clouds.','Said every witness before the third chapter.','Clouds are never just clouds. Ask a pilot.'],['Maybe the clouds are alibis.','An alibi made of vapor. Elegant.','Floating alibis. I am writing that down.'])},
+{w:W('overcast'),q:['Heavy overcast. The sky is withholding. What is it withholding from you?','Grey ceiling. Does it press on you?'],o:O(['Honestly, a bit of relief.','Relief is the first thing to hide behind.','Relief. Yes. The lid is on. Nothing falls out.'],['Nothing. I feel fine.','Fine. The most expensive word I hear.','Fine is a coat. Take it off.'],['What if the grey is the clue?','Now you think like me. Slow down.','A clue the colour of every other day. Clever.'])},
+{w:W('rain'),q:['Rain. Listen to that rhythm. Does it sound like someone counting?','The rain is tapping. Whose fingers are those?'],o:O(['It sounds like a clock.','A clock. Whose time is running out?','Time. Always time. Your answer is in the notes.'],['It sounds like nothing.','Nothing makes the loudest noise in this room.','Nothing is a very busy thing to listen to.'],['Could the rain be a signal?','A signal to whom? Do not answer. Yet.','Signals need receivers. I see only you.'])},
+{w:W('storm'),q:['Thunder. The sky has stopped being polite. What did you do to provoke it?','A storm. Lightning shows everything for one second. What would it show on you?'],o:O(['I changed the sound. I’m sorry.','An apology, in a storm. Remarkably honest.','Sorry accepted. The thunder is not so sure.'],['Nothing. It started on its own.','They always say that. Then the lights go out.','On its own. Like a guilty conscience.'],['Let it strike. I’m curious.','Reckless. I respect that, and I fear it.','Curiosity killed the alibi. Fascinating.'])},
+{w:W('snow'),q:['Snow. Everything soft, quiet, covered. What are you hoping gets buried?','Snow is falling. Footprints vanish. Whose were yours?'],o:O(['Nothing. I like the quiet.','Quiet is where confessions grow.','Quiet. Yes. I wrote “shh” in the margin.'],['Old footprints, maybe.','Old footprints. Now we are getting somewhere.','Maybe is not a footprint, but I will take it.'],['Snow leaves a trail by hiding one.','That is nearly poetry. Nearly evidence.','A trail by hiding. I am stealing that line.'])},
+{w:W('fog'),q:['Fog. I cannot see the culprit, and neither can they. Or can you?','The fog is thick. Describe the last thing you saw clearly.'],o:O(['My own hands, I think.','Hands. The usual suspects.','Your hands. Mine are shaking slightly. Ignore that.'],['Honestly, nothing.','Nothing again. We keep arriving there.','Nothing is a very crowded room.'],['I saw the sound turn into sky.','Say that again. Slowly. I am writing.','Sound became sky. Nobody else has said that.'])},
+{w:()=>S.drums,q:['Drums. Someone is knocking. Do you want to answer?','That drumbeat. Heartbeat, or alarm?'],o:O(['A heartbeat. Mine.','Yours. Mine joined in around the third beat.','A heartbeat. We share one now. Unfortunate.'],['An alarm. Obviously.','Alarm. Then who is on the other side of it?','Obviously. Nothing is obvious in here.'],['Turn it up and see.','Turning it up is how most cases get worse.','Bold. Lightning likes drums. Remember that.'])},
+{w:()=>S.bpm>85,q:['The tempo is racing. What are you running from?','Fast music, fast weather. Slow down and tell me the truth.'],o:O(['Deadlines, mostly.','Deadlines. Mine is the end of this session.','Deadlines. Then we have something in common.'],['I’m not running.','Your foot is tapping at ninety beats.','Not running. Yet the wind is.'],['Maybe the wind is chasing me.','Wind never chases. It only follows. Think about it.','Chasing, following. The gap between them is my whole career.'])},
+{w:()=>S.bpm<58,q:['The tempo has crawled. Everything is waiting. What are we waiting for?','Slow music. Slow clouds. Why am I whispering?'],o:O(['For the next change.','The next change. Pencil ready.','Patience. A rare habit in suspects.'],['For nothing. I’m relaxed.','Relaxed people do not check the window that often.','Relaxed. Then why did you sit on the edge?'],['Maybe time is the witness.','Time cannot testify. It can only pass. Sadly.','A witness that leaves every second. Terrible reliability.'])},
+{w:()=>S.wet>.7,q:['So much echo. Every word comes back. Do you hear your own voice returning?','There is so much space in the sound. What fills it?'],o:O(['Yes, and it sounds younger.','Younger. Ink is already on the page.','Younger voices say truer things. Typically.'],['No echo. You’re imagining things.','I imagine things for a living. It pays poorly.','Imagine, then. Both of us.'],['The echo is the real witness.','An echo repeats, never lies. Excellent witness.','Witness: the echo. Alibi: the same, but delayed.'])},
+{w:()=>!S.play,q:['The music has stopped. The sky is holding its breath. Did you do that?','Silence. In this office that is the loudest sound there is.'],o:O(['I just needed a moment.','A moment. I will give you thirty seconds.','Moments are what cases are made of.'],['I didn’t touch anything.','Nothing was touched. Everything changed. Familiar.','Hands off, as always.'],['Press play. Let’s see what breaks.','Now we experiment. Dr. Voss approves.','Science! Mostly impatience, but science.'])}];
+const TH=[
+['You cooperate too much. The sound is not a crime scene, it is a confession. The weather is {W} and it agrees.','A trusting witness. Your music writes the sky, the sky writes me. I am the last link.','You trust me, so I will trust the pattern: sound first, weather second, doctor third.'],
+['You dodge every question. People dodge when the sky is their fault. Today it is {W}.','Evasion is data. Many dodges, one {W}. Not a coincidence.','Every evasion you make, the sky mirrors. I will prove it. Probably.'],
+['Your curiosity is contagious. The weather is {W} because you asked. Possibly because I did.','You ask better questions than my notes do. That is a clue and a compliment.','You are not a suspect. You are an investigator who has not noticed yet.']];
+const CHN=["The Chair","The Window","The Notebook","The Accusation","The Forecast"];
+let ni=0,clues=0,tt,talking=false,ch=0,bi=0,wi=false,wx0=wx,F={};
+const dom=()=>ST.indexOf(Math.max(...ST)),rs=x=>typeof x==="function"?x():pk([].concat(x));
+const fmt=s=>s.replace(/\{W\}/g,WN[wx]).replace("{N}",(notes[0]||"Nothing yet. Suspicious.").replace(/^\[[\d:]+\] /,""));
+function hud(){$("case").textContent=`· ${ch+1}/5 ${CHN[ch]} · Clues ${clues} · Trust ${ST[0]} · Suspicion ${ST[1]} · Curiosity ${ST[2]}`}
+function tone(ix,l){ST[ix]++;lastAns=l;hud()}
+function say(s,cb){clearInterval(tt);let i=0;talking=true;$("txt").textContent="";
+ tt=setInterval(()=>{$("txt").textContent=s.slice(0,++i);if(i>=s.length){clearInterval(tt);talking=false;cb&&cb()}},26)}
+function inter(){ni++;if(Math.random()<.4)return salon();if(ni%2){const p=[];CX.forEach((c,i)=>{if(i!==lastCx&&c.w())p.push(i)});if(p.length){lastCx=pk(p);return CX[lastCx]}}return pk(ND)}
+const RC=[()=>F.weather&&"You came here for the weather. I have not forgotten. ",()=>F.friend&&"Your friend still has not called. ",()=>F.door&&"You said the door was open. It was locked. ",()=>F.proved&&"Our experiment still bothers me. ",()=>F.invented&&"Your invented friend sends regards. ",()=>F.sleepless&&"Did you sleep? I did not. ",()=>F.love&&"How is the Driftbox? Still loved? "];
+function ending(){const d=dom();let t,x;
+ if(F.both&&F.pencildown){t="MUTUAL ALIBI";x="You and Dr. Voss close the notebook together. The sky holds still for the first time in months, as if waiting for an explanation neither of you will give."}
+ else if(d===0){t="CLEAR SKIES";x="Dr. Voss sleeps through the night. Outside, {W} settles over the rooftops. You leave the door open, on purpose."}
+ else if(d===1){t="THE LONG STORM";x="Dr. Voss keeps writing. The pencil never stops, and neither does the weather. The case stays open. So does the window."}
+ else{t="THE OPEN WINDOW";x="You and the doctor swap chairs. Now you hold the notebook, and the sky waits to see what you write."}
+ return "★ ENDING: "+t+" — "+x}
+const BT=[
+{c:0,q:"Before we start: why did you really come to this office?",o:[["The weather. It follows my music.","Bold. You say the quiet part first. Noted, in ink.",{f:"weather",s:2}],["A friend sent me.","A friend. Name? No? The pencil waits.",{f:"friend",s:0}],["The door was open.","Doors in this building do not open themselves. Suspicious.",{f:"door",s:1}]]},
+{c:0,q:"The little radio on your side of the room. Does it have a name?",o:[["The Driftbox. I love it.","Love. Strong word for a speaker. Written down.",{f:"love",s:0}],["It’s just a radio.","Everyone’s radio is just a radio. Until it rains.",{f:"deny",s:1}],["I haven’t decided yet.","Undecided. The most hopeful kind of suspect.",{s:2}]]},
+{c:0,q:"Last question of the first chapter. When the sky changed the first time, were you scared?",o:[["A little.","Honest. I was terrified. Professionally concerned, I mean.",{f:"scared",s:0}],["No. It was beautiful.","Beautiful. A dangerous word near a window.",{f:"beauty",s:2}],["I didn’t notice.","Not noticing is a skill. Or a symptom.",{s:1}]]},
+{c:1,q:()=>`Look at the window. {W}. ${F.weather?"You came for the weather, and here it is, as ordered.":F.friend?"Your friend would have had an opinion about this.":"Funny how the door opened right before it changed."}`,o:[["It’s lovely.","Lovely. My notes say “suspicious”. We disagree.",{s:0}],["It’s your window, not mine.","My window. My weather? Hm. I need to sit with that.",{f:"yourwindow",s:1}],["Let’s test it.","Excellent. A scientist. Rare in this chair.",{f:"test",s:2}]]},
+{c:1,q:"Last night I hummed your tune near the glass. Light drizzle. Inside a minute.",o:[["You hummed it wrong.","I hum on key. The drizzle did not complain.",{s:1}],["Show me.","Later. First, the real experiment. Yes, now.",{f:"hum",s:2}],["Stop poking my sky.","Poking. Noted. The sky may have felt it.",{s:0}]]},
+{c:1,q:"Experiment. Change the sound now: a mood button, or Evolve. Then tell me you are done. I will check the window.",o:[["Done. Check it.",()=>wx!==wx0?(F.proved=1,"The sky moved: "+WN[wx0]+" to "+WN[wx]+". Proof. Writing it in ink."):(F.stalled=1,"Still "+WN[wx]+". Nothing moved. I am writing “stalled”. In pencil."),{s:2}],["I refuse.","Refusal is also data. Pencil.",{f:"refused",s:1}]]},
+{c:2,q:()=>`My notebook, page one: {N} ${F.proved?"You gave me the proof.":F.stalled?"And the sky stalled on you. Embarrassing for someone.":"Nothing is proven yet."}`,o:[["Read me the rest.","The rest is sealed. For your safety.",{s:0}],["That entry is wrong.","Then correct it. Take the pencil. Do not actually take it.",{s:1}],["Can I add an entry?","Add one. I will pretend I did not see you reach.",{f:"wrote",s:2}]]},
+{c:2,if:()=>F.friend,q:"Your friend. I called every number in this building. No such person. Why?",o:[["They moved away.","Moved. From a place with no door and no phone?",{s:0}],["Wrong numbers, probably.","Probably. Probability is the grammar of excuses.",{s:1}],["Fine. I made them up.","A confession! Small, human, well received.",{f:"invented",s:2}]]},
+{c:2,if:()=>F.door&&!F.friend,q:"The door. I checked: locked at nine. You said it was open. Who opened it?",o:[["It was open. I swear.","Swearing on a locked door. Interesting.",{s:1}],["Maybe the weather did.","The weather as locksmith. Hm.",{f:"locksmith",s:2}],["You did, probably.","I did? I did not. Unless I did.",{s:0}]]},
+{c:2,if:()=>!F.door&&!F.friend,q:"You said you came for the weather. People do that when they want to hear they are not alone.",o:[["Maybe I did.","Then you are not. I am here. So is the sky.",{s:0}],["That’s not why.","Then why? Do not answer. I will find out.",{s:1}],["Is that why you stay?","...Write that down for me, would you?",{f:"voss",s:2}]]},
+{c:2,q:"Something not in the notes. I have not slept properly since the sky first changed. Do you?",o:[["Not really.","Then we are the same. Poor sleepers under a patient sky.",{f:"sleepless",s:0}],["I sleep fine.","Fine. A lie wearing pajamas.",{s:1}],["Maybe the sky keeps us awake.","Hm. I wrote that. Underlined.",{s:2}]]},
+{c:3,if:()=>dom()===1,q:"I am going to accuse you. Not of a crime. Of a pattern. Every time you doubt me, the sky turns hard.",o:[["Deny it.","Denial in the same pitch every time. Interesting.",{f:"denied",s:1}],["Confess.","You admit it? Then I was right. I hate being right.",{f:"confessed",s:0}],["Accuse yourself.","Turning the chair around is a first. I will write it.",{f:"turned",s:2}]]},
+{c:3,if:()=>dom()===0,q:"You cooperate more than any case I have had. I think I trust you. That is unprofessional.",o:[["Trust is allowed.","Allowed, yes. Wise, no. Delightful, somewhat.",{s:0}],["Don’t. It’s risky.","Risky? Then I am in. Do not stop me.",{s:1}],["Tell me why.","Because the sky was kind whenever you were polite.",{f:"turned",s:2}]]},
+{c:3,if:()=>dom()===2,q:"You ask better questions than I do. So ask me one. I will answer honestly. Once.",o:[["Who writes the weather?","Not the music alone. Not the pencil alone. Hold that.",{f:"asked",s:2}],["Are you afraid?","Yes. Of finding out it is me.",{f:"afraid",s:0}],["What’s in the sealed pages?","Blank. All of them. I am ashamed.",{f:"blank",s:1}]]},
+{c:3,q:"Here is the truth. Every time I take notes, the weather moves. The pencil, not you. Or both of us.",o:[["Put the pencil down.","Down. The notebook is closed. Silence. And the sky... did not stop. Hm.",{f:"pencildown",s:2}],["Keep writing.","Writing. Faster. The window brightens. Dear me. I cannot stop.",{f:"keepwriting",s:1}],["It’s both of us.","Both. Yes. A pair. A very strange pair.",{f:"both",s:0}]]},
+{c:4,end:1,q:"Our last session. What weather should we leave behind for tomorrow?",o:[["Sunshine, finally.",ending,{s:0,run:MOODS.bright}],["Let it storm.",ending,{s:1,run:MOODS.haunted}],["Let the music decide.",ending,{s:2,run:evolve}]]}
+];
+let pend=0;
+const FT=[
+["e","Einstein’s 1905 paper “Does the inertia of a body depend upon its energy content?” ran only a few pages. It argued that a body giving off energy loses mass, and E = mc² is the short form of that idea."],
+["e","Since c² is about 9 × 10¹⁶ in SI units, one gram of mass corresponds to roughly 9 × 10¹³ joules, around twenty kilotons of TNT. Mass is a very compact bank account."],
+["e","“mc mod 2” is not physics. It is modular arithmetic: the remainder of mc after dividing by 2. A real operation, just not Einstein’s equation. The physics one is E = mc², with no remainder."],
+["e","The Sun turns about four million tonnes of mass into energy every second through fusion. That is E = mc² at work every day, not a slogan."],
+["e","In 1919 Arthur Eddington’s eclipse expeditions measured starlight bending near the Sun, agreeing with Einstein’s general relativity and making him world-famous."],
+["e","GPS satellite clocks must be corrected for speed and for weaker gravity. Without relativity they would drift about 38 microseconds fast per day. Your phone depends on Einstein."],
+["m","In 1901 Bertrand Russell found a paradox in naive set theory: the set of all sets that do not contain themselves. He wrote to Frege about it in 1902, and Frege’s system shook."],
+["m","Russell and Whitehead’s Principia Mathematica (1910–1913) took hundreds of pages before it proved that 1 + 1 = 2. Rigor is slow."],
+["m","Archimedes squeezed pi between 223/71 and 22/7 using polygons with 96 sides. He also asked for a sphere inside a cylinder on his tomb."],
+["m","Plato held that mathematical objects, like perfect circles, are real in a realm of Forms. Many mathematicians still talk as if they discover theorems rather than invent them."],
+["m","In 1960 Eugene Wigner wrote about the “unreasonable effectiveness” of mathematics in the natural sciences, asking why abstract structures fit the physical world so well. The question is still open."],
+["m","Einstein asked in 1921 how mathematics, a product of human thought, can fit physical reality so well. He offered astonishment rather than an answer."],
+["g","Einstein rejected a personal God but admired Spinoza’s God, the order of nature. In 1926 he wrote to Max Born that he did not believe God plays dice with the universe."],
+["g","In a 1954 letter to Eric Gutkind, Einstein called the word “God” an expression and product of human weakness. Elsewhere he spoke of a cosmic religious feeling toward nature’s order."],
+["g","In 1952 Bertrand Russell proposed a tiny china teapot orbiting the Sun between Earth and Mars. His point: the burden of proof lies on whoever makes the claim, not on those who cannot disprove it."],
+["g","Socrates was tried in Athens in 399 BC for impiety and corrupting the young, and he drank hemlock. He wrote nothing; we know him mainly through Plato and Xenophon."],
+["g","Karl Popper argued in 1934 that a scientific claim must risk being proved false. So whether a God exists may be a question for philosophy rather than experiment, which is neither an insult nor a rescue."],
+["g","Arthur Schopenhauer thought the world’s core is a blind striving he called Will, not a caring mind. Einstein liked his remark that a man can do what he wills but cannot will what he wills."],
+["a","In 1950, over lunch at Los Alamos, Enrico Fermi asked where everybody was. That is the Fermi paradox: so many stars, and still no signal."],
+["a","In 1961 Frank Drake wrote an equation to estimate communicating civilizations in our galaxy. Its terms are so uncertain that answers range from us alone to thousands of others."],
+["a","The observable universe is roughly 93 billion light-years across and holds hundreds of billions to trillions of galaxies, depending on the estimate. Thousands of exoplanets are confirmed. Life elsewhere: none confirmed yet."],
+["a","In Plato’s cave allegory in the Republic, prisoners mistake shadows for reality. Maybe we are not alone but only watching shadows. Plato would ask who turns us around."],
+["a","Shakespeare’s Hamlet says there are more things in heaven and earth than are dreamt of in your philosophy. A fair warning to anyone declaring the cosmos empty, or full."],
+["s","J. Robert Oppenheimer directed Los Alamos. After the Trinity test on 16 July 1945 he later recalled a line from the Bhagavad Gita about becoming Death. In 1947 he said physicists had known sin."],
+["s","In 1939 Einstein signed a letter to President Roosevelt, drafted largely by Leo Szilard, warning that Germany might build atomic bombs. He did not work on the Manhattan Project and later regretted signing."],
+["s","In 1955 Bertrand Russell and Einstein co-authored a manifesto warning about nuclear war. Einstein signed days before he died. It led to the Pugwash conferences."],
+["s","In 1954 Oppenheimer lost his security clearance after a hearing. Science that builds bombs also builds politics, and the scientist rarely controls either."],
+["s","“Positive” sciences come from Auguste Comte’s positivism in the 1830s and 1840s: knowledge built from observation, not authority. Hence this office’s rule: notebook first, opinions after."],
+["h","Shakespeare and Galileo were both born in 1564. One mapped the human mind in verse; the other aimed a telescope at Jupiter’s moons in 1610. Same era, two instruments."],
+["h","In Plato’s Apology, Socrates says the unexamined life is not worth living for a human being. Plato was about twenty-eight when his teacher died."],
+["h","Schopenhauer scheduled his Berlin lectures in 1820 against Hegel’s, and almost nobody came. Fame arrived decades later."],
+["h","The Archimedes Palimpsest: a tenth-century copy of his work was scraped and reused for a prayer book, then rediscovered in 1906 by Johan Heiberg. Lost mathematics tends to survive somewhere."],
+["h","Hamlet says he could be bounded in a nutshell and count himself a king of infinite space, were it not for bad dreams. It is about a mind containing a universe."]
+];
+const TQ={e:["Which strikes you as stranger: mass as energy, or bending time?","Does it bother you that matter is stored energy?"],m:["Is mathematics discovered or invented?","Why would numbers care about stars?"],g:["Does science have anything to say about God, or is that a different department?","Where does the burden of proof sit for you?"],a:["Are we alone, or just early, or just quiet?","Which is scarier: an empty universe or a crowded one?"],s:["Who owns a discovery once it exists?","Should a physicist be held responsible for what others build?"],h:["Can a play or a proof tell the truth better?","What is the examined life worth to you?"]};
+const OP=["A fact, not a theory:","From the historical record:","Let me cite something I trust.","Verified, as far as I can verify:","Here is one for the notebook."],AG=["Good. Evidence likes company.","Agreed. Written in ink.","Yes. The sky nodded too."],DB=["Doubt is healthy. Check the sources; I did.","Fair. Science asks to be doubted. That is its trick.","Doubt noted. The evidence is unmoved, but polite."],MO=["Then also:","Another page:","Related, and real:"];
+const used=new Set();
+function pf(k){let p=FT.map((f,i)=>i).filter(i=>FT[i][0]===k&&!used.has(i));if(!p.length){FT.forEach((f,i)=>{if(FT[i][0]===k)used.delete(i)});p=FT.map((f,i)=>i).filter(i=>FT[i][0]===k)}const i=pk(p);used.add(i);return FT[i][1]}
+function salon(k){k=k||pk(Object.keys(TQ));const f=pf(k);return{q:()=>pk(OP)+" "+f+" "+pk(TQ[k]),o:[["I agree.",()=>pk(AG),{s:0}],["I doubt it.",()=>pk(DB),{s:1}],["Tell me more.",()=>pk(MO)+" "+pf(k),{s:2}]]}}
+const TN={e:"⚛ E = mc²",m:"∑ Math",g:"✦ God?",a:"🌌 Alone?",s:"☢ Science & ethics",h:"🎭 Mind & art"};
+Object.keys(TN).forEach(k=>{const b=document.createElement("button");b.textContent=TN[k];b.onclick=()=>{if(entered&&!talking)ask(salon(k))};$("topics").appendChild(b)});
+function ask(fo){let n,B=0;
+ if(fo){if(pend){bi--;wi=false}n=fo;B=1;pend=0}else{
+ if(!wi)while(bi<BT.length&&BT[bi].if&&!BT[bi].if())bi++;
+ if(!wi&&bi<BT.length){n=BT[bi++];B=1;ch=n.c;wi=true;wx0=wx;pend=n}else{n=inter();wi=false;pend=0}}
+ let pre="";
+ if(!B){const r=RC.map(f=>f()).filter(Boolean);if(r.length&&Math.random()<.35)pre=pk(r);else if(lastAns&&Math.random()<.3)pre=`Earlier you told me “${lastAns}”. I have not forgotten. `}
+ if(notes.length>seen+1||(seen===0&&notes.length>1))pre=`The window just turned to ${WN[wx]}. Writing that down. `;seen=notes.length;
+ hud();$("opts").innerHTML="";$("you").textContent="";
+ say(pre+fmt(rs(n.q)),()=>{$("opts").innerHTML="";n.o.forEach(([l,r,e0],ix)=>{const b=document.createElement("button");b.textContent="▸ "+l;
+  b.onclick=()=>{$("opts").innerHTML="";$("you").textContent="You: "+l;clues++;pend=0;const e=B?(e0||{}):{s:ix};if(e.f)F[e.f]=1;
+   if(e.run){e.run();fx();sync();if(!S.play)try{play()}catch(x){}}if(e.s!=null)tone(e.s,l);hud();
+   say(fmt(rs(r))+(B?"":aside()),()=>{const c=document.createElement("button");c.textContent="Continue ▸";c.onclick=()=>ask();$("opts").appendChild(c);
+    if(n.end){const a=document.createElement("button");a.textContent="↺ New case";a.onclick=()=>{F={};ST.fill(0);clues=0;bi=0;ch=0;wi=false;lastAns="";ask()};$("opts").appendChild(a)}})};
+  $("opts").appendChild(b)})})}
+$("enter").onclick=()=>{$("gate").style.display="none";entered=true;t0=performance.now();enterT=t0;if(!S.play)try{play()}catch(e){}watch(true)};
+let enterT=0,started=false;
+
+// ---- pixel room ----
+const g=$("cv").getContext("2d");g.imageSmoothingEnabled=false;
+const R=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x|0,y|0,w|0,h|0)};
+const PA=Array.from({length:70},()=>({x:Math.random()*48,y:Math.random()*36,v:.6+Math.random()*.8}));
+const CLD=Array.from({length:5},(_,i)=>({x:i*14-6,y:4+(i%3)*6,w:12+i%2*5}));
+let flash=0,lt=3,last=performance.now();
+function person(x,y,c,o){const{sw=0,sit=false,arm=0,nod=0,mouth=false,gl=false}=o;
+ if(!sit){R(x-sw,y+20,4,12,c.p);R(x+4+sw,y+20,4,12,c.p)}
+ R(x,y+8,8,12,c.s);R(x-3,y+8+(sit?0:sw/2),3,11,c.s);R(x+8,y+8-(sit?0:sw/2),3,11,c.s);
+ if(sit)R(x-8,y+13+arm,10,3,c.s);
+ R(x,y+nod,8,8,c.k);R(x,y+nod,8,3,c.h);R(x+1,y+4+nod,2,1,"#fff");R(x+5,y+4+nod,2,1,"#fff");R(x+2,y+4+nod,1,1,"#336");R(x+6,y+4+nod,1,1,"#336");
+ if(gl){R(x,y+3.5+nod,8,1,"#111")}R(x+3,y+6+nod,2,mouth?2:1,"#722")}
+function sky(k){R(72,10,48,36,SK[k]);
+ if(k==="sunny"||k==="cloudy"){R(98,13,10,10,"rgba(255,240,150,.35)");R(100,15,6,6,"#ffe45c")}
+ const cc=k==="storm"?"#4a5060":k==="overcast"||k==="rain"?"#9aa1ab":"#fff";
+ CLD.slice(0,CL[k]).forEach(c=>{R(72+c.x%60,10+c.y,c.w,4,cc);R(72+c.x%60+3,10+c.y-2,c.w-6,3,cc)});}
+function frame(now){requestAnimationFrame(frame);const dt=Math.min(.05,(now-last)/1e3);last=now;const t=now/1e3,w=wind();
+ fade=Math.min(1,fade+dt/1.5);
+ // room
+ R(0,0,192,70,"#8a6a3f");for(let y=0;y<70;y+=7)R(0,y,192,1,"#6f5430");for(let x=0;x<192;x+=24)R(x+(x/24%2)*12,0,1,70,"#6f5430");
+ for(let y=70;y<108;y+=8)for(let x=0;x<192;x+=8)R(x,y,8,8,((x+y)/8)%2?"#5b3d20":"#4e3219");R(0,68,192,3,"#3a2812");
+ R(92,0,8,5,"#f6d365");R(94,1,2,2,"#fff3b0");
+ // shelf
+ R(6,12,34,48,"#4a3318");[0,1,2].forEach(r=>{R(8,15+r*15,30,12,"#2b1d0c");for(let b=0;b<7;b++)R(9+b*4,17+r*15+(b%3),3,10-(b%3),["#b33","#36a","#3a6","#cb3","#83a","#3aa","#c63"][(b+r*2)%7])});
+ R(132,14,18,14,"#4a3318");R(134,16,14,10,"#eee");R(137,19,8,1,"#999");R(137,22,5,1,"#999");
+ // window scene
+ g.save();g.beginPath();g.rect(72,10,48,36);g.clip();
+ sky(pw);g.globalAlpha=fade;sky(wx);g.globalAlpha=1;
+ const sn=wx==="snow";R(72,40,48,6,sn?"#eef3f8":"#5a9e3a");[84,108].forEach(x=>{R(x,28,3,12,"#6b4a2a");R(x-5,20,13,9,sn?"#dfe8ef":"#3f7f2c")});
+ if(wx==="rain"||wx==="storm"||sn){const n=wx==="storm"?70:wx==="rain"?40:36;for(let i=0;i<n;i++){const p=PA[i];p.y+=p.v*(sn?10:70)*dt;p.x+=w*(sn?6:14)*dt*p.v;if(p.y>36){p.y=0;p.x=Math.random()*48}if(p.x>48)p.x-=48;
+  sn?R(72+p.x,10+p.y,1.5,1.5,"#fff"):R(72+p.x,10+p.y,1,3,"#9cc4ff")}}
+ CLD.forEach(c=>c.x+=dt*(1+w*8));CLD.forEach(c=>{if(c.x>60)c.x=-20});
+ if(wx==="fog"||(S.wet>.82&&wx!=="sunny"))R(72,10,48,36,"rgba(220,225,230,.5)");
+ if(wx==="storm"){lt-=dt;if(lt<0){flash=1;lt=(S.drums?1.5:3.5)+Math.random()*3}}flash=Math.max(0,flash-dt*3);
+ if(flash>0)R(72,10,48,36,`rgba(255,255,255,${flash*.8})`);
+ g.restore();
+ R(70,8,52,3,"#5a3d1c");R(70,46,52,3,"#5a3d1c");R(70,8,3,41,"#5a3d1c");R(119,8,3,41,"#5a3d1c");R(95,10,2,36,"#5a3d1c");R(72,27,48,2,"#5a3d1c");
+ // desk + psychologist
+ R(147,30,18,26,"#3b2a1a");
+ const sc=Math.sin(t*9)*1.2,k=talking&&((t*8|0)%2);
+ person(152,30,{s:"#eee",p:"#ccc",k:"#c68e6a",h:"#3a2a1a"},{sit:true,arm:sc*.4,nod:Math.sin(t*1.6)>.85?1:0,mouth:k,gl:true});
+ R(118,52,72,4,"#a0773f");R(118,56,72,28,"#7b5a2e");R(122,60,26,10,"#5a3f1e");R(124,64,8,2,"#c9a45c");R(158,60,26,10,"#5a3f1e");R(167,64,8,2,"#c9a45c");R(118,84,4,10,"#5a3f1e");R(186,84,4,10,"#5a3f1e");
+ R(134,49,10,3,"#fff");R(135+sc,48,5,1,"#ffd34d");R(120,48,4,4,"#4fa8a8");R(121,46,2,3,"#3a8a3a");
+ // player
+ const el=entered?(now-enterT)/1e3:0,px=entered?Math.min(64,-12+el*28):-30,walk=entered&&px<64;
+ if(entered&&!walk&&!started){started=true;say("Ah, you are back. Case file: The Wandering Weather. Take the chair. We have done this before.",()=>setTimeout(ask,700))}
+ person(px,64,{s:"#0aa",p:"#339",k:"#d9a27a",h:"#4a2f1a"},{sw:walk?Math.sin(t*10)*2:0,nod:Math.sin(t*2.2)>.8?1:0});
+ if(entered&&!walk&&!talking&&$("opts").children.length){g.fillStyle="#fff";g.font="9px monospace";g.fillText("?",px+3,60)}
+ if(talking){g.fillStyle="#fff";g.font="9px monospace";g.fillText("...",155,26)}
+ g.fillStyle=AM[wx];g.fillRect(0,0,192,108);if(flash>0){g.fillStyle=`rgba(255,255,255,${flash*.25})`;g.fillRect(0,0,192,108)}
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
